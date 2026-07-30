@@ -86,16 +86,37 @@ jobs:
           exit 1
 
       - name: Build for iOS Simulator
+        id: build
         working-directory: AiTrainerIOS
         run: |
           set -euo pipefail
+          DERIVED="${GITHUB_WORKSPACE}/AiTrainerIOS/DerivedData"
           xcodebuild build \
             -project AiTrainer.xcodeproj \
             -scheme AiTrainer \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
             -sdk iphonesimulator \
+            -derivedDataPath "$DERIVED" \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee "${GITHUB_WORKSPACE}/xcodebuild-build.log"
+          APP_PATH=$(find "$DERIVED/Build/Products" -name 'AiTrainer.app' -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "AiTrainer.app not found under $DERIVED/Build/Products"
+            find "$DERIVED" -name '*.app' || true
+            exit 1
+          fi
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+          echo "Built Simulator app: $APP_PATH"
+          du -sh "$APP_PATH"
+
+      - name: Upload Simulator app artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AiTrainer-Simulator
+          path: ${{ steps.build.outputs.app_path }}
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Print xcodebuild log on failure
         if: failure()

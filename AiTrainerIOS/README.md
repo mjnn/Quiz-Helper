@@ -106,6 +106,12 @@ Actions 页绿勾 = SRS 单测 + iOS 编译通过
 - 打开失败 Job → 展开 **Print SRS test log on failure** 或 **Print xcodebuild log on failure**
 - 或下载 Artifact **ios-ci-logs**（含 `swift-test.log` / `xcodebuild-build.log`）
 
+**构建产物：**
+
+CI 成功后在 Actions 页 → 对应 Run → **Artifacts** → 下载 **AiTrainer-Simulator**（`.app`，供模拟器使用）。
+
+> 说明：当前流水线是 `xcodebuild build`（Simulator 版），**不是**可装真机的 `.ipa`；真机包需要 Apple 开发者签名与 `archive` 流程，尚未配置。
+
 ---
 
 ## 功能清单
