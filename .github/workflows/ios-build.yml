@@ -44,6 +44,9 @@ jobs:
       - name: Sync question bank assets
         run: python3 scripts/sync_assets.py
 
+      - name: Run SRS unit tests (Swift Package)
+        run: swift test
+
       - name: Generate Xcode project
         run: xcodegen generate
 
@@ -51,7 +54,6 @@ jobs:
         id: sim
         run: |
           set -euo pipefail
-          # Prefer recent iPhone simulators shipped with Xcode on GitHub runners.
           for NAME in "iPhone 16" "iPhone 16 Pro" "iPhone 15" "iPhone 15 Pro" "iPhone SE (3rd generation)"; do
             if xcrun simctl list devices available | grep -F "$NAME" | grep -q .; then
               echo "name=$NAME" >> "$GITHUB_OUTPUT"
@@ -71,15 +73,12 @@ jobs:
             -scheme AiTrainer \
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
             -sdk iphonesimulator \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee ../xcodebuild-build.log
 
-      - name: Run SRS unit tests (AiTrainerCoreTests)
-        run: |
-          set -euo pipefail
-          xcodebuild test \
-            -project AiTrainer.xcodeproj \
-            -scheme AiTrainer \
-            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
-            -sdk iphonesimulator \
-            -only-testing:AiTrainerCoreTests \
-            CODE_SIGNING_ALLOWED=NO
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: xcodebuild-build.log

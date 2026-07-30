@@ -60,32 +60,40 @@ struct HomeView: View {
     @Bindable var vm: AppViewModel
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("AI训练师理论刷题")
-                        .font(.largeTitle.bold())
-                    Text("\(AppConfig.versionLabel) · 作者：\(AppConfig.author)")
-                        .foregroundStyle(AppTheme.inkSecondary)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("AI训练师理论刷题")
+                            .font(.largeTitle.bold())
+                        Text("\(AppConfig.versionLabel) · 作者：\(AppConfig.author)")
+                            .foregroundStyle(AppTheme.inkSecondary)
+                    }
+
+                    ElevatedCard {
+                        Text("共 \(vm.stats.totalQuestions) 题 · 待复习 \(vm.stats.dueCount) · 未刷 \(vm.stats.newCount)")
+                            .foregroundStyle(AppTheme.inkPrimary)
+                        Text("蓝柱=还记得 · 红柱=已遗忘/到期")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.inkSecondary)
+                    }
+
+                    StageChartView(stages: vm.stageStats)
+
+                    HStack(spacing: 12) {
+                        SecondaryButton(title: "错题本") { vm.showWrongNotebook() }
+                        PrimaryButton(title: "开始刷题") { vm.requestStartPractice(mode: .quiz) }
+                    }
                 }
-
-                ElevatedCard {
-                    Text("共 \(vm.stats.totalQuestions) 题 · 待复习 \(vm.stats.dueCount) · 未刷 \(vm.stats.newCount)")
-                        .foregroundStyle(AppTheme.inkPrimary)
-                    Text("蓝柱=还记得 · 红柱=已遗忘/到期")
-                        .font(.caption)
-                        .foregroundStyle(AppTheme.inkSecondary)
-                }
-
-                StageChartView(stages: vm.stageStats)
-
-                HStack(spacing: 12) {
-                    SecondaryButton(title: "错题本") { vm.showWrongNotebook() }
-                    PrimaryButton(title: "开始刷题") { vm.requestStartPractice(mode: .quiz) }
+                .padding(20)
+            }
+            .background(AppTheme.paper)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("设置") { vm.openSettings() }
                 }
             }
-            .padding(20)
         }
-        .background(AppTheme.paper)
     }
 }

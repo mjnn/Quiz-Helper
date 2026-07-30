@@ -33,23 +33,14 @@ targets:
     dependencies:
       - package: AiTrainerCore
 
-  AiTrainerCoreTests:
-    type: bundle.unit-test
-    platform: iOS
-    sources:
-      - path: AiTrainerCore/Tests/AiTrainerCoreTests
-    dependencies:
-      - target: AiTrainer
-      - package: AiTrainerCore
-    settings:
-      base:
-        GENERATE_INFOPLIST_FILE: YES
-
 schemes:
   AiTrainer:
     build:
       targets:
         AiTrainer: all
     test:
+      gatherCoverageData: false
       targets:
-        - AiTrainerCoreTests
+        - name: AiTrainerCoreTests
+          parallelizable: true
+          randomExecutionOrder: false

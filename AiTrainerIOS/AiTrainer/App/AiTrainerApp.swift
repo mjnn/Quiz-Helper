@@ -48,11 +48,6 @@ struct RootView: View {
             LoadErrorView(message: message)
         case .home:
             HomeView(vm: vm)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("设置") { vm.openSettings() }
-                    }
-                }
         case .practice(let questions, let index, let answers, let mode):
             PracticeView(vm: vm, questions: questions, index: index, answers: answers, mode: mode)
         case .result(let stats, let wrongItems):
