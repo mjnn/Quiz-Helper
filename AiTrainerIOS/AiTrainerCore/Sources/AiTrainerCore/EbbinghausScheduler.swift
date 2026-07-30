@@ -10,16 +10,16 @@ public enum EbbinghausScheduler {
 
     private static let intervalMs: [Int64] = [
         0,
-        5 * 60 * 1000,
-        30 * 60 * 1000,
-        12 * 60 * 60 * 1000,
-        24 * 60 * 60 * 1000,
-        2 * 24 * 60 * 60 * 1000,
-        4 * 24 * 60 * 60 * 1000,
-        7 * 24 * 60 * 60 * 1000,
-        15 * 24 * 60 * 60 * 1000,
-        30 * 24 * 60 * 60 * 1000,
-        60 * 24 * 60 * 60 * 1000,
+        Int64(5 * 60 * 1000),
+        Int64(30 * 60 * 1000),
+        Int64(12 * 60 * 60 * 1000),
+        Int64(24 * 60 * 60 * 1000),
+        Int64(2 * 24 * 60 * 60 * 1000),
+        Int64(4 * 24 * 60 * 60 * 1000),
+        Int64(7 * 24 * 60 * 60 * 1000),
+        Int64(15 * 24 * 60 * 60 * 1000),
+        Int64(30 * 24 * 60 * 60 * 1000),
+        Int64(60 * 24 * 60 * 60 * 1000),
     ]
 
     public static let cycleLabels = [
@@ -180,7 +180,7 @@ public enum EbbinghausScheduler {
         let interval = state.intervalMs > 0 ? state.intervalMs : (stage <= stageNew ? 0 : scaledInterval(intervalMs[stage], ease: ease))
         let nextAt: Int64 = (stage == stageNew && state.timesSeen == 0)
             ? 0
-            : min(state.nextReviewAt, now + 365 * 24 * 60 * 60 * 1000)
+            : min(state.nextReviewAt, now + Int64(365 * 24 * 60 * 60 * 1000))
         return QuestionMemoryState(
             id: state.id,
             stage: stage,

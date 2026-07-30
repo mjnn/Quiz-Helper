@@ -1,8 +1,9 @@
 import XCTest
-@testable import AiTrainerCore
+import AiTrainerCore
 
 final class EbbinghausSchedulerTests: XCTestCase {
     private let now: Int64 = 1_700_000_000_000
+    private let fiveMinMs = Int64(5 * 60 * 1000)
 
     func testNewQuestionIsEligibleAndDue() {
         let state = EbbinghausScheduler.defaultState(id: "q1")
@@ -17,15 +18,15 @@ final class EbbinghausSchedulerTests: XCTestCase {
         XCTAssertEqual(after.stage, 1)
         XCTAssertEqual(after.reps, 0)
         XCTAssertTrue(EbbinghausScheduler.isLearning(after))
-        XCTAssertEqual(after.nextReviewAt, now + 5 * 60 * 1000)
+        XCTAssertEqual(after.nextReviewAt, now + fiveMinMs)
     }
 
     func testDueReviewCorrectAdvancesStageAndIncrementsReps() {
         let learning = QuestionMemoryState(
             id: "q1",
             stage: 1,
-            nextReviewAt: now - 60 * 1000,
-            lastReviewAt: now - 6 * 60 * 1000,
+            nextReviewAt: now - Int64(60 * 1000),
+            lastReviewAt: now - Int64(6 * 60 * 1000),
             timesSeen: 1,
             reps: 0
         )
@@ -37,7 +38,7 @@ final class EbbinghausSchedulerTests: XCTestCase {
     }
 
     func testCorrectBeforeDueDoesNotAdvance() {
-        let future = now + 10 * 60 * 1000
+        let future = now + Int64(10 * 60 * 1000)
         let scheduled = QuestionMemoryState(
             id: "q1",
             stage: 2,
@@ -76,7 +77,7 @@ final class EbbinghausSchedulerTests: XCTestCase {
     }
 
     func testScheduledQuestionNotEligibleUntilDue() {
-        let future = now + 7 * 24 * 60 * 60 * 1000
+        let future = now + Int64(7 * 24 * 60 * 60 * 1000)
         let state = QuestionMemoryState(id: "q1", stage: 4, nextReviewAt: future, timesSeen: 3, reps: 2)
         XCTAssertFalse(EbbinghausScheduler.isDue(state, now: now))
         XCTAssertFalse(EbbinghausScheduler.isEligibleForDraw(state, now: now))
@@ -98,12 +99,12 @@ final class EbbinghausSchedulerTests: XCTestCase {
     }
 
     func testForgetUrgencyIncreasesAsReviewApproaches() {
-        let next = now + 10 * 60 * 1000
+        let next = now + Int64(10 * 60 * 1000)
         let state = QuestionMemoryState(id: "q1", stage: 1, nextReviewAt: next, lastReviewAt: now, timesSeen: 1)
-        let earlyU = EbbinghausScheduler.forgetUrgency(state, now: now + 2 * 60 * 1000)
-        let lateU = EbbinghausScheduler.forgetUrgency(state, now: now + 8 * 60 * 1000)
+        let earlyU = EbbinghausScheduler.forgetUrgency(state, now: now + Int64(2 * 60 * 1000))
+        let lateU = EbbinghausScheduler.forgetUrgency(state, now: now + Int64(8 * 60 * 1000))
         XCTAssertGreaterThan(lateU, earlyU)
-        XCTAssertGreaterThanOrEqual(EbbinghausScheduler.forgetUrgency(state, now: next), 1)
+        XCTAssertGreaterThanOrEqual(EbbinghausScheduler.forgetUrgency(state, now: next), 1.0)
     }
 
     func testStageTenCapsAtSixtyDayInterval() {

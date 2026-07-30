@@ -30,6 +30,7 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
     dependencies:
       - package: AiTrainerCore
 
