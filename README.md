@@ -87,7 +87,9 @@ python AiTrainer/scripts/emulator_ocr_preview_flow.py
 
 **查看结果：** https://github.com/mjnn/Quiz-Helper/actions  
 
-失败时 Job Summary 会输出构建日志末尾；也可下载 `ios-ci-logs` artifact。
+**Simulator 产物：** Run 成功 → Artifacts → `AiTrainer-Simulator`  
+
+**真机 IPA：** 见 [`AiTrainerIOS/docs/device-ipa-setup.md`](AiTrainerIOS/docs/device-ipa-setup.md)，触发 **iOS Export IPA** 工作流。
 
 ---
 

@@ -110,7 +110,21 @@ Actions 页绿勾 = SRS 单测 + iOS 编译通过
 
 CI 成功后在 Actions 页 → 对应 Run → **Artifacts** → 下载 **AiTrainer-Simulator**（`.app`，供模拟器使用）。
 
-> 说明：当前流水线是 `xcodebuild build`（Simulator 版），**不是**可装真机的 `.ipa`；真机包需要 Apple 开发者签名与 `archive` 流程，尚未配置。
+> 说明：当前流水线是 `xcodebuild build`（Simulator 版），**不是**可装真机的 `.ipa`；真机包见下方。
+
+### 真机 IPA
+
+需要 Apple Developer 账号。配置 GitHub Secrets 后，手动触发 **[iOS Export IPA](../../.github/workflows/ios-ipa.yml)** 工作流。
+
+完整步骤：[`docs/device-ipa-setup.md`](docs/device-ipa-setup.md)
+
+| export_method | 用途 |
+|---------------|------|
+| `development` | 自测，设备 UDID 需登记 |
+| `ad-hoc` | 内测分发 |
+| `app-store` | TestFlight / 上架（可勾选自动上传） |
+
+产物 Artifact：`AiTrainer-<method>-ipa`
 
 ---
 

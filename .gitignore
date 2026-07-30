@@ -26,6 +26,7 @@ AiTrainer/*.jks
 # iOS / Xcode
 AiTrainerIOS/.build/
 AiTrainerIOS/DerivedData/
+AiTrainerIOS/ExportOptions.plist
 AiTrainerIOS/*.xcodeproj/
 AiTrainerIOS/*.xcworkspace/
 AiTrainerIOS/xcuserdata/
