@@ -8,6 +8,9 @@
 screenshot_*.png
 test_*.png
 
+# Release APKs (build locally)
+release/*.apk
+
 # Android build
 AiTrainer/.gradle/
 AiTrainer/build/
