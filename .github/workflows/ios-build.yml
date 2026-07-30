@@ -45,6 +45,7 @@ jobs:
         run: python3 scripts/sync_assets.py
 
       - name: Run SRS unit tests (Swift Package)
+        working-directory: AiTrainerIOS/AiTrainerCore
         run: swift test
 
       - name: Generate Xcode project
