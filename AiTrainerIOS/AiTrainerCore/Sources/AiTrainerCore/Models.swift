@@ -166,6 +166,13 @@ public struct PracticeResultStats: Equatable {
     public var err: Int
     public var skip: Int
     public var total: Int
+
+    public init(ok: Int, err: Int, skip: Int, total: Int) {
+        self.ok = ok
+        self.err = err
+        self.skip = skip
+        self.total = total
+    }
 }
 
 public struct AppStats: Equatable {
@@ -177,6 +184,22 @@ public struct AppStats: Equatable {
     public var totalQuestions: Int
 
     public var bankCount: Int { dueCount + newCount }
+
+    public init(
+        dueCount: Int,
+        newCount: Int,
+        scheduledCount: Int,
+        lapseCount: Int,
+        lastWrongCount: Int,
+        totalQuestions: Int
+    ) {
+        self.dueCount = dueCount
+        self.newCount = newCount
+        self.scheduledCount = scheduledCount
+        self.lapseCount = lapseCount
+        self.lastWrongCount = lastWrongCount
+        self.totalQuestions = totalQuestions
+    }
 }
 
 public struct StageStat: Equatable, Identifiable {
@@ -188,6 +211,15 @@ public struct StageStat: Equatable, Identifiable {
     public var freshCount: Int
 
     public var id: Int { stage }
+
+    public init(stage: Int, label: String, cycleLabel: String, count: Int, dueCount: Int, freshCount: Int) {
+        self.stage = stage
+        self.label = label
+        self.cycleLabel = cycleLabel
+        self.count = count
+        self.dueCount = dueCount
+        self.freshCount = freshCount
+    }
 }
 
 public enum MemoryRetention: String {
@@ -298,6 +330,24 @@ public struct QuestionBankInfo: Equatable {
     public var canRestoreBuiltIn: Bool
     public var fullSingleCount: Int
     public var fullJudgeCount: Int
+
+    public init(
+        total: Int,
+        singleCount: Int,
+        judgeCount: Int,
+        sourceLabel: String,
+        canRestoreBuiltIn: Bool,
+        fullSingleCount: Int,
+        fullJudgeCount: Int
+    ) {
+        self.total = total
+        self.singleCount = singleCount
+        self.judgeCount = judgeCount
+        self.sourceLabel = sourceLabel
+        self.canRestoreBuiltIn = canRestoreBuiltIn
+        self.fullSingleCount = fullSingleCount
+        self.fullJudgeCount = fullJudgeCount
+    }
 }
 
 public enum LiveSessionRestore {
