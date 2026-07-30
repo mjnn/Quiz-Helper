@@ -207,7 +207,7 @@ public struct WrongNotebookEntry: Equatable, Identifiable {
     public var id: String { entryId }
 }
 
-public enum BankKind: String, Codable, CaseIterable {
+public enum BankKind: String, Codable, CaseIterable, Hashable {
     case single
     case judge
 
@@ -233,7 +233,7 @@ public enum BankKind: String, Codable, CaseIterable {
     }
 }
 
-public enum DrawScope: String, Codable, CaseIterable {
+public enum DrawScope: String, Codable, CaseIterable, Hashable {
     case smart
     case all
     case single

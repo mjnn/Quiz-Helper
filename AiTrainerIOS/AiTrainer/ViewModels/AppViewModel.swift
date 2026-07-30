@@ -29,14 +29,15 @@ final class AppViewModel {
     private let engine: PracticeEngine
 
     init(
-        questionRepo: QuestionRepository = QuestionRepository(),
+        questionRepo: QuestionRepository? = nil,
         progressRepo: ProgressRepository? = nil,
-        settingsRepo: SettingsRepository = SettingsRepository()
+        settingsRepo: SettingsRepository? = nil
     ) {
+        let questionRepo = questionRepo ?? QuestionRepository()
         self.questionRepo = questionRepo
         let progress = progressRepo ?? ProgressRepository(questions: questionRepo)
         self.progressRepo = progress
-        self.settingsRepo = settingsRepo
+        self.settingsRepo = settingsRepo ?? SettingsRepository()
         self.engine = PracticeEngine(questions: questionRepo, progress: progress)
         bootstrap()
     }

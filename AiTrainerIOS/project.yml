@@ -25,6 +25,7 @@ targets:
         CURRENT_PROJECT_VERSION: "15"
         SWIFT_VERSION: "5.9"
         SWIFT_STRICT_CONCURRENCY: minimal
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
         DEVELOPMENT_TEAM: ""
         INFOPLIST_KEY_CFBundleDisplayName: "AI训练师刷题"
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES

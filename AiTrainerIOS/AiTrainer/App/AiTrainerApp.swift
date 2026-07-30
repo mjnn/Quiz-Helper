@@ -3,7 +3,11 @@ import AiTrainerCore
 
 @main
 struct AiTrainerApp: App {
-    @State private var vm = AppViewModel()
+    @State private var vm: AppViewModel
+
+    init() {
+        _vm = State(initialValue: AppViewModel())
+    }
 
     var body: some Scene {
         WindowGroup {
