@@ -67,7 +67,7 @@ public final class QuestionRepository {
     }
 
     public func countForKind(_ kind: BankKind) -> Int {
-        questions.count { $0.type == kind.type }
+        questions.filter { $0.type == kind.type }.count
     }
 
     public func reload() {
@@ -82,8 +82,8 @@ public final class QuestionRepository {
         let active = questionsForBanks(enabledBanks)
         return QuestionBankInfo(
             total: active.count,
-            singleCount: active.count { $0.type == BankKind.single.type },
-            judgeCount: active.count { $0.type == BankKind.judge.type },
+            singleCount: active.filter { $0.type == BankKind.single.type }.count,
+            judgeCount: active.filter { $0.type == BankKind.judge.type }.count,
             sourceLabel: usesImportedBank ? "导入题库" : "内置题库",
             canRestoreBuiltIn: usesImportedBank,
             fullSingleCount: fullSingle,

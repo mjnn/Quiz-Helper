@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
@@ -11,10 +11,18 @@ let package = Package(
         .library(name: "AiTrainerCore", targets: ["AiTrainerCore"]),
     ],
     targets: [
-        .target(name: "AiTrainerCore"),
+        .target(
+            name: "AiTrainerCore",
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
+        ),
         .testTarget(
             name: "AiTrainerCoreTests",
-            dependencies: ["AiTrainerCore"]
+            dependencies: ["AiTrainerCore"],
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]
         ),
     ]
 )

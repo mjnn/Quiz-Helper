@@ -43,10 +43,27 @@ jobs:
 
       - name: Run SRS unit tests (Swift Package)
         working-directory: AiTrainerIOS/AiTrainerCore
+        shell: bash
         run: |
-          set -euo pipefail
-          swift build
-          swift test -v 2>&1 | tee ../../swift-test.log
+          set -euxo pipefail
+          LOG="${GITHUB_WORKSPACE}/swift-test.log"
+          swift build -v 2>&1 | tee "$LOG"
+          swift test -v 2>&1 | tee -a "$LOG"
+
+      - name: Print SRS test log on failure
+        if: failure()
+        shell: bash
+        run: |
+          LOG="${GITHUB_WORKSPACE}/swift-test.log"
+          if [ -f "$LOG" ]; then
+            echo "## swift-test.log (last 200 lines)" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 200 "$LOG" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 200 "$LOG"
+          else
+            echo "Log file not found: $LOG"
+          fi
 
       - name: Generate Xcode project
         working-directory: AiTrainerIOS
@@ -78,7 +95,19 @@ jobs:
             -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
             -sdk iphonesimulator \
             CODE_SIGNING_ALLOWED=NO \
-            2>&1 | tee ../xcodebuild-build.log
+            2>&1 | tee "${GITHUB_WORKSPACE}/xcodebuild-build.log"
+
+      - name: Print xcodebuild log on failure
+        if: failure()
+        shell: bash
+        run: |
+          LOG="${GITHUB_WORKSPACE}/xcodebuild-build.log"
+          if [ -f "$LOG" ]; then
+            echo "## xcodebuild-build.log (last 200 lines)" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 200 "$LOG" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload CI logs on failure
         if: failure()
@@ -86,5 +115,6 @@ jobs:
         with:
           name: ios-ci-logs
           path: |
-            swift-test.log
-            xcodebuild-build.log
+            ${{ github.workspace }}/swift-test.log
+            ${{ github.workspace }}/xcodebuild-build.log
+          if-no-files-found: warn

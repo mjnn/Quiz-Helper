@@ -56,7 +56,7 @@ public struct WrongReviewItem: Codable, Equatable, Identifiable {
     public var skipped: Bool
     public var roundLabel: String?
 
-    enum CodingKeys: String, CodingKey {
+    public enum CodingKeys: String, CodingKey {
         case id, tag, type, stem, options, answer, expl, answerExpl, optionExpls, mem, assoc
         case userAnswer
         case skipped = "_skipped"
