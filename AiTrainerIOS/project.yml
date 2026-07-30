@@ -32,8 +32,11 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: "-"
     dependencies:
       - package: AiTrainerCore
+        product: AiTrainerCore
 
 schemes:
   AiTrainer:

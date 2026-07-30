@@ -1,6 +1,6 @@
 import Foundation
 
-public final class QuestionRepository {
+public final class QuestionRepository: @unchecked Sendable {
     private let bundle: Bundle
     private let documentsDirectory: URL
     private var loaded = false

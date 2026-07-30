@@ -1,6 +1,6 @@
 import Foundation
 
-public final class SettingsRepository {
+public final class SettingsRepository: @unchecked Sendable {
     private let defaults: UserDefaults
 
     public init(defaults: UserDefaults = .standard) {

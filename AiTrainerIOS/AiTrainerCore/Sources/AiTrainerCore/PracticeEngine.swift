@@ -1,6 +1,6 @@
 import Foundation
 
-public final class PracticeEngine {
+public final class PracticeEngine: @unchecked Sendable {
     private let questions: QuestionRepository
     private let progress: ProgressRepository
 

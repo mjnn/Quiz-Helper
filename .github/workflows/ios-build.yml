@@ -108,6 +108,9 @@ jobs:
             grep -E "error:" "$LOG" | tail -n 50 >> "$GITHUB_STEP_SUMMARY" || true
             echo '```' >> "$GITHUB_STEP_SUMMARY"
             echo "---- xcodebuild errors ----"
+            grep -E "error:" "$LOG" | tail -n 50 | while IFS= read -r line; do
+              echo "::error title=xcodebuild::$line"
+            done || true
             grep -E "error:" "$LOG" | tail -n 50 || true
             echo "---- xcodebuild log tail ----"
             tail -n 80 "$LOG"

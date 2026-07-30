@@ -1,6 +1,6 @@
 import Foundation
 
-public final class ProgressRepository {
+public final class ProgressRepository: @unchecked Sendable {
     private let defaults: UserDefaults
     private let questions: QuestionRepository
     private var memoryCache: [String: QuestionMemoryState]?
