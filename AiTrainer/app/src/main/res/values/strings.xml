@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AI训练师三级理论刷题</string>
+    <string name="author_label">作者：马老师</string>
+    <string name="continue_practice">继续练习</string>
+    <string name="start_practice">开始练习</string>
+    <string name="start_quiz">开始刷题</string>
+    <string name="start_memorize">开始背题</string>
+    <string name="load_error_title">无法启动</string>
+</resources>

@@ -1,0 +1,25 @@
+# IDE / OS
+.idea/
+.cursor/
+*.iml
+.DS_Store
+
+# Local verification screenshots
+screenshot_*.png
+test_*.png
+
+# Android build
+AiTrainer/.gradle/
+AiTrainer/build/
+AiTrainer/app/build/
+AiTrainer/local.properties
+AiTrainer/captures/
+AiTrainer/.externalNativeBuild/
+AiTrainer/.cxx/
+AiTrainer/keystore.properties
+AiTrainer/*.keystore
+AiTrainer/*.jks
+
+# Logs / tools
+*.log
+androguard.db
