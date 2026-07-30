@@ -103,10 +103,14 @@ jobs:
         run: |
           LOG="${GITHUB_WORKSPACE}/xcodebuild-build.log"
           if [ -f "$LOG" ]; then
-            echo "## xcodebuild-build.log (last 200 lines)" >> "$GITHUB_STEP_SUMMARY"
+            echo "## xcodebuild errors" >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
-            tail -n 200 "$LOG" >> "$GITHUB_STEP_SUMMARY"
+            grep -E "error:" "$LOG" | tail -n 50 >> "$GITHUB_STEP_SUMMARY" || true
             echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "---- xcodebuild errors ----"
+            grep -E "error:" "$LOG" | tail -n 50 || true
+            echo "---- xcodebuild log tail ----"
+            tail -n 80 "$LOG"
           fi
 
       - name: Upload CI logs on failure

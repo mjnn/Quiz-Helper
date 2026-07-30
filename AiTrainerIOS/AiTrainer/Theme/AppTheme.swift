@@ -15,7 +15,11 @@ enum AppTheme {
 }
 
 struct ElevatedCard<Content: View>: View {
-    @ViewBuilder var content: () -> Content
+    private let content: () -> Content
+
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12, content: content)

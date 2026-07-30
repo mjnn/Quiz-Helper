@@ -11,6 +11,7 @@ enum AppScreen: Equatable {
     case allCaughtUp
 }
 
+@MainActor
 @Observable
 final class AppViewModel {
     var screen: AppScreen = .home
