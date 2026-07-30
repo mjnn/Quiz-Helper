@@ -29,9 +29,9 @@ public final class PracticeEngine {
         case .smart, .all:
             return questions.questionsForBanks(enabled)
         case .single:
-            return questions.byType(BankKind.single.type).filter { enabled.contains(.single) }
+            return enabled.contains(.single) ? questions.byType(BankKind.single.type) : []
         case .judge:
-            return questions.byType(BankKind.judge.type).filter { enabled.contains(.judge) }
+            return enabled.contains(.judge) ? questions.byType(BankKind.judge.type) : []
         case .wrong:
             return progress.wrongNotebook(activeIds: questions.activeIds(enabled)).map(\.question)
         }
