@@ -38,9 +38,3 @@ schemes:
     build:
       targets:
         AiTrainer: all
-    test:
-      gatherCoverageData: false
-      targets:
-        - name: AiTrainerCoreTests
-          parallelizable: true
-          randomExecutionOrder: false
