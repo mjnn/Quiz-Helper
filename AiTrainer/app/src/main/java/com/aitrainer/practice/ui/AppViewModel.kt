@@ -19,6 +19,12 @@ import com.aitrainer.practice.data.Question
 import com.aitrainer.practice.data.QuestionRepository
 import com.aitrainer.practice.data.BankKind
 import com.aitrainer.practice.data.DrawScope
+import com.aitrainer.practice.data.DraftQuestion
+import com.aitrainer.practice.data.DuplicatePolicy
+import com.aitrainer.practice.data.MergeStats
+import com.aitrainer.practice.data.OcrBatchExporter
+import com.aitrainer.practice.data.OcrQuestionParser
+import com.aitrainer.practice.data.OcrTextRecognizer
 import com.aitrainer.practice.data.PracticeDrawSettings
 import com.aitrainer.practice.data.QuestionBankInfo
 import com.aitrainer.practice.data.SettingsRepository
@@ -26,9 +32,11 @@ import com.aitrainer.practice.data.StageBankItem
 import com.aitrainer.practice.data.StageStat
 import com.aitrainer.practice.data.WrongNotebookEntry
 import com.aitrainer.practice.data.WrongReviewItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed class Screen {
     data class LoadError(val message: String) : Screen()
@@ -48,7 +56,21 @@ sealed class Screen {
     ) : Screen()
     data class Bank(val title: String, val items: List<StageBankItem>, val stage: Int? = null) : Screen()
     data class Review(val title: String, val items: List<WrongReviewItem>, val backTo: Screen? = null) : Screen()
+    data object OcrImportReview : Screen()
+    data object OcrDraftPreview : Screen()
+    data class OcrDraftEdit(val draftId: String) : Screen()
 }
+
+data class OcrImportSession(
+    val drafts: List<DraftQuestion>,
+    val rawText: String,
+    val selectedIds: Set<String> = drafts.map { it.draftId }.toSet(),
+    val duplicatePolicy: DuplicatePolicy = DuplicatePolicy.SKIP,
+    val targetBank: BankKind = BankKind.SINGLE,
+    val previewIndex: Int = 0,
+    /** 本批次累计处理的图片张数 */
+    val processedImageCount: Int = 0,
+)
 
 sealed class PendingDialog {
     data class DiscardLiveSession(
@@ -60,6 +82,7 @@ sealed class PendingDialog {
     data class CancelPractice(val answered: Int, val total: Int) : PendingDialog()
     data object ResetConfirm : PendingDialog()
     data object RestoreBuiltInBankConfirm : PendingDialog()
+    data class ImportBankPicker(val uri: Uri) : PendingDialog()
 }
 
 data class LiveSessionSummary(val progress: Int, val total: Int, val mode: PracticeMode)
@@ -77,6 +100,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val progress = ProgressRepository(app, questionRepo)
     private val settingsRepo = SettingsRepository(app)
     private val engine = PracticeEngine(questionRepo, progress)
+    private val ocrRecognizer = OcrTextRecognizer(app)
 
     var screen by mutableStateOf<Screen>(Screen.Home)
         private set
@@ -99,6 +123,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var drawSettings by mutableStateOf(PracticeDrawSettings())
         private set
     var bankInfo by mutableStateOf(QuestionBankInfo(0, 0, 0, "内置题库", false, 0, 0))
+        private set
+    var ocrLoading by mutableStateOf(false)
+        private set
+    var ocrSession by mutableStateOf<OcrImportSession?>(null)
+        private set
+    var pendingOcrExportJson by mutableStateOf<String?>(null)
         private set
 
     private var pendingPracticeMode: PracticeMode = PracticeMode.QUIZ
@@ -173,18 +203,310 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun importQuestionBank(uri: Uri) {
         settingsOpen = false
-        questionRepo.importFromUri(uri)
-            .onSuccess { count ->
-                progress.mergeMemoryAfterImport()
-                progress.sanitizeBank()
-                refreshHomeData()
-                refreshSettingsData()
-                refreshLiveSessionSummary()
-                toast = "已导入 $count 题，${if (questionRepo.usesImportedBank) "当前使用导入题库" else "题库已更新"}"
+        pendingDialog = PendingDialog.ImportBankPicker(uri)
+    }
+
+    fun confirmJsonImportToBank(target: BankKind) {
+        val dialog = pendingDialog as? PendingDialog.ImportBankPicker ?: return
+        pendingDialog = null
+        questionRepo.importFromUri(dialog.uri, target)
+            .onSuccess { stats ->
+                finishImportIntoBank(target, stats, source = "JSON")
             }
             .onFailure { error ->
                 toast = "导入失败：${error.message ?: "未知错误"}"
             }
+    }
+
+    private fun finishImportIntoBank(target: BankKind, stats: MergeStats, source: String) {
+        ensureBankEnabled(target)
+        progress.mergeMemoryAfterImport()
+        progress.sanitizeBank()
+        refreshHomeData()
+        refreshSettingsData()
+        refreshLiveSessionSummary()
+        val parts = buildList {
+            add("新增 ${stats.added} 题")
+            if (stats.updated > 0) add("覆盖 ${stats.updated} 题")
+            if (stats.skipped > 0) add("跳过 ${stats.skipped} 题")
+        }
+        toast = "$source 已导入至${target.displayName}：${parts.joinToString("，")}"
+    }
+
+    private fun ensureBankEnabled(kind: BankKind) {
+        val current = drawSettings.enabledBankSet()
+        if (kind in current) return
+        val next = drawSettings.copy(enabledBanks = (current + kind).sortedBy { it.ordinal }).normalized()
+        drawSettings = next
+        settingsRepo.saveDrawSettings(next)
+    }
+
+    fun startOcrFromUri(uri: Uri) {
+        startOcrFromUris(listOf(uri))
+    }
+
+    fun startOcrFromUris(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        settingsOpen = false
+        ocrLoading = true
+        viewModelScope.launch {
+            val allDrafts = mutableListOf<DraftQuestion>()
+            val rawParts = mutableListOf<String>()
+            var failures = 0
+            var emptyTexts = 0
+
+            uris.forEachIndexed { index, uri ->
+                val result = withContext(Dispatchers.IO) {
+                    ocrRecognizer.recognize(uri)
+                }
+                result.onSuccess { text ->
+                    if (text.isBlank()) {
+                        emptyTexts++
+                    } else {
+                        rawParts.add("--- 图片 ${index + 1} ---\n$text")
+                        allDrafts.addAll(
+                            withContext(Dispatchers.Default) {
+                                OcrQuestionParser.parse(text)
+                            },
+                        )
+                    }
+                }.onFailure {
+                    failures++
+                }
+            }
+
+            ocrLoading = false
+            when {
+                rawParts.isEmpty() && failures == uris.size ->
+                    toast = "批量 OCR 全部失败"
+                rawParts.isEmpty() && emptyTexts == uris.size ->
+                    toast = "未识别到文字，请换更清晰的图片"
+                else -> {
+                    mergeOcrResults(
+                        rawText = rawParts.joinToString("\n\n"),
+                        drafts = allDrafts,
+                        addedImages = uris.size,
+                    )
+                    val notes = buildList {
+                        if (failures > 0) add("${failures} 张失败")
+                        if (emptyTexts > 0) add("${emptyTexts} 张无文字")
+                        if (allDrafts.isEmpty()) add("未解析出新题")
+                    }
+                    if (notes.isNotEmpty()) {
+                        toast = "批量识别完成：${notes.joinToString("，")}"
+                    } else if (uris.size > 1) {
+                        toast = "已合并 ${uris.size} 张图片的识别结果"
+                    }
+                }
+            }
+        }
+    }
+
+    private fun mergeOcrResults(
+        rawText: String,
+        drafts: List<DraftQuestion>,
+        addedImages: Int = 1,
+    ) {
+        val existing = ocrSession
+        ocrSession = if (existing == null) {
+            OcrImportSession(
+                drafts = drafts,
+                rawText = rawText,
+                processedImageCount = addedImages,
+            )
+        } else {
+            existing.copy(
+                drafts = existing.drafts + drafts,
+                rawText = buildString {
+                    if (existing.rawText.isNotBlank()) append(existing.rawText)
+                    if (existing.rawText.isNotBlank() && rawText.isNotBlank()) append("\n\n")
+                    append(rawText)
+                },
+                selectedIds = existing.selectedIds + drafts.map { it.draftId }.toSet(),
+                processedImageCount = existing.processedImageCount + addedImages,
+            )
+        }
+        val session = ocrSession ?: return
+        screen = if (session.drafts.isNotEmpty()) {
+            val previewIndex = when {
+                existing != null && drafts.isNotEmpty() ->
+                    existing.drafts.size.coerceIn(0, session.drafts.lastIndex)
+                existing == null ->
+                    0
+                else ->
+                    session.previewIndex.coerceIn(0, session.drafts.lastIndex)
+            }
+            ocrSession = session.copy(previewIndex = previewIndex)
+            Screen.OcrDraftPreview
+        } else {
+            Screen.OcrImportReview
+        }
+        if (drafts.isEmpty() && rawText.isNotBlank()) {
+            toast = "未解析出新题目，可手动添加或查看原始文本"
+        }
+    }
+
+    fun openOcrDraftPreview() {
+        val session = ocrSession ?: return
+        if (session.drafts.isEmpty()) return
+        ocrSession = session.copy(
+            previewIndex = session.previewIndex.coerceIn(0, session.drafts.lastIndex),
+        )
+        screen = Screen.OcrDraftPreview
+    }
+
+    fun openOcrImportSettings() {
+        screen = Screen.OcrImportReview
+    }
+
+    fun ocrPreviewNext() {
+        val session = ocrSession ?: return
+        if (session.previewIndex >= session.drafts.lastIndex) return
+        ocrSession = session.copy(previewIndex = session.previewIndex + 1)
+    }
+
+    fun ocrPreviewPrevious() {
+        val session = ocrSession ?: return
+        if (session.previewIndex <= 0) return
+        ocrSession = session.copy(previewIndex = session.previewIndex - 1)
+    }
+
+    fun openOcrDraftEdit(draftId: String) {
+        val session = ocrSession ?: return
+        if (session.drafts.none { it.draftId == draftId }) return
+        screen = Screen.OcrDraftEdit(draftId)
+    }
+
+    fun closeOcrDraftEdit() {
+        screen = Screen.OcrDraftPreview
+    }
+
+    fun saveOcrDraftEdit(updated: DraftQuestion) {
+        updateOcrDraft(updated)
+        closeOcrDraftEdit()
+    }
+
+    fun removeOcrDraft(draftId: String) {
+        val session = ocrSession ?: return
+        val newDrafts = session.drafts.filter { it.draftId != draftId }
+        if (newDrafts.isEmpty()) {
+            ocrSession = session.copy(
+                drafts = emptyList(),
+                selectedIds = emptySet(),
+                previewIndex = 0,
+            )
+            screen = Screen.OcrImportReview
+            return
+        }
+        val removedIndex = session.drafts.indexOfFirst { it.draftId == draftId }
+        val newIndex = when {
+            session.previewIndex > removedIndex -> session.previewIndex - 1
+            session.previewIndex >= newDrafts.size -> newDrafts.lastIndex
+            else -> session.previewIndex
+        }
+        ocrSession = session.copy(
+            drafts = newDrafts,
+            selectedIds = session.selectedIds - draftId,
+            previewIndex = newIndex.coerceIn(0, newDrafts.lastIndex),
+        )
+    }
+
+    fun toggleOcrDraftSelected(draftId: String) {
+        val session = ocrSession ?: return
+        val nextSelected = if (draftId in session.selectedIds) {
+            session.selectedIds - draftId
+        } else {
+            session.selectedIds + draftId
+        }
+        ocrSession = session.copy(selectedIds = nextSelected)
+    }
+
+    fun updateOcrDraft(updated: DraftQuestion) {
+        val session = ocrSession ?: return
+        ocrSession = session.copy(
+            drafts = session.drafts.map { draft ->
+                if (draft.draftId == updated.draftId) updated.withValidation() else draft
+            },
+        )
+    }
+
+    fun addOcrDraft() {
+        val newDraft = DraftQuestion(
+            type = "单选",
+            options = listOf("A. ", "B. ", "C. ", "D. "),
+        ).withValidation()
+        val session = ocrSession
+        ocrSession = if (session == null) {
+            OcrImportSession(listOf(newDraft), "")
+        } else {
+            session.copy(
+                drafts = session.drafts + newDraft,
+                selectedIds = session.selectedIds + newDraft.draftId,
+                previewIndex = session.drafts.size,
+            )
+        }
+        screen = Screen.OcrDraftPreview
+    }
+
+    fun setOcrDuplicatePolicy(policy: DuplicatePolicy) {
+        val session = ocrSession ?: return
+        ocrSession = session.copy(duplicatePolicy = policy)
+    }
+
+    fun setOcrTargetBank(bank: BankKind) {
+        val session = ocrSession ?: return
+        ocrSession = session.copy(targetBank = bank)
+    }
+
+    fun exportOcrBatch() {
+        val session = ocrSession ?: return
+        val selectedDrafts = session.drafts.filter { it.draftId in session.selectedIds }
+        if (selectedDrafts.isEmpty()) {
+            toast = "请至少选择一题导出"
+            return
+        }
+        runCatching {
+            OcrBatchExporter.toJson(selectedDrafts, questionRepo.allIds().toSet())
+        }.onSuccess { json ->
+            pendingOcrExportJson = json
+        }.onFailure { error ->
+            toast = "导出失败：${error.message ?: "未知错误"}"
+        }
+    }
+
+    fun consumeOcrExportRequest() {
+        pendingOcrExportJson = null
+    }
+
+    fun confirmOcrImport() {
+        val session = ocrSession ?: return
+        val selectedDrafts = session.drafts.filter { it.draftId in session.selectedIds }
+        if (selectedDrafts.isEmpty()) {
+            toast = "请至少选择一题导入"
+            return
+        }
+        val existingIds = questionRepo.allIds().toSet()
+        val target = session.targetBank
+        val incoming = selectedDrafts.mapIndexedNotNull { index, draft ->
+            draft.withValidation().toQuestion(existingIds, index, target)
+        }
+        if (incoming.isEmpty()) {
+            toast = "所选题目无效，请检查题干"
+            return
+        }
+        questionRepo.mergeQuestionsIntoBank(incoming, target, session.duplicatePolicy)
+            .onSuccess { stats ->
+                finishImportIntoBank(target, stats, source = "OCR")
+                cancelOcrImport()
+            }
+            .onFailure { error ->
+                toast = "导入失败：${error.message ?: "未知错误"}"
+            }
+    }
+
+    fun cancelOcrImport() {
+        ocrSession = null
+        goHome()
     }
 
     fun updateSessionLimit(limit: Int) {
@@ -485,6 +807,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun navigateBack(): Boolean {
         when (pendingDialog) {
             is PendingDialog.DiscardLiveSession, is PendingDialog.CancelPractice,
+            is PendingDialog.ImportBankPicker,
             PendingDialog.ResetConfirm, PendingDialog.RestoreBuiltInBankConfirm,
             -> {
                 dismissDialog()
@@ -503,6 +826,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             is Screen.Result, is Screen.Bank, Screen.AllCaughtUp, Screen.WrongNotebook -> {
                 goHome()
+                true
+            }
+            Screen.OcrImportReview -> {
+                cancelOcrImport()
+                true
+            }
+            Screen.OcrDraftPreview -> {
+                openOcrImportSettings()
+                true
+            }
+            is Screen.OcrDraftEdit -> {
+                closeOcrDraftEdit()
                 true
             }
             else -> false

@@ -5,11 +5,20 @@ import com.google.gson.annotations.SerializedName
 data class Question(
     val id: String,
     val tag: String,
+    /** 题目类型：`单选` 或 `判断` */
     val type: String,
+    /** 题干 */
     val stem: String,
+    /** 选项列表；单选为 `A. …` 形式，判断为 `正确`/`错误` */
     val options: List<String>,
+    /** 正确选项；单选 `A`–`D`，判断 `正确`/`错误` */
     val answer: String,
+    /** 题目解析（整题层面，可空） */
     val expl: String = "",
+    /** 正确选项解析（为何该选项正确，可空） */
+    val answerExpl: String? = null,
+    /** 各选项解析；key 为单选 `A`–`D` 或判断 `正确`/`错误`（可空、可缺 key） */
+    val optionExpls: Map<String, String>? = null,
     val mem: String = "",
     val assoc: String = "",
 )
@@ -22,6 +31,8 @@ data class WrongReviewItem(
     val options: List<String>,
     val answer: String,
     val expl: String = "",
+    val answerExpl: String? = null,
+    val optionExpls: Map<String, String>? = null,
     val mem: String = "",
     val assoc: String = "",
     @SerializedName("userAnswer") val userAnswer: String? = null,
@@ -38,6 +49,8 @@ data class WrongReviewItem(
                 options = q.options,
                 answer = q.answer,
                 expl = q.expl,
+                answerExpl = q.answerExpl,
+                optionExpls = q.optionExpls,
                 mem = q.mem,
                 assoc = q.assoc,
                 userAnswer = userAnswer,
@@ -46,6 +59,20 @@ data class WrongReviewItem(
             )
     }
 }
+
+fun WrongReviewItem.toQuestion(): Question = Question(
+    id = id,
+    tag = tag,
+    type = type,
+    stem = stem,
+    options = options,
+    answer = answer,
+    expl = expl,
+    answerExpl = answerExpl,
+    optionExpls = optionExpls,
+    mem = mem,
+    assoc = assoc,
+)
 
 data class HistoryRound(
     val ts: Long = 0L,

@@ -67,6 +67,7 @@ import com.aitrainer.practice.R
 import com.aitrainer.practice.data.AppConfig
 import com.aitrainer.practice.data.AppStats
 import com.aitrainer.practice.data.MemoryRetention
+import com.aitrainer.practice.data.Question
 import com.aitrainer.practice.data.QuestionLogic
 import com.aitrainer.practice.ui.theme.Accent
 import com.aitrainer.practice.ui.theme.AccentHover
@@ -399,6 +400,7 @@ fun OptionChoice(
     correct: Boolean = false,
     wrong: Boolean = false,
     enabled: Boolean = true,
+    optionExpl: String? = null,
     onClick: () -> Unit,
 ) {
     val scale by animateFloatAsState(if (selected) 1.01f else 1f, spring(stiffness = 400f), label = "optScale")
@@ -441,35 +443,46 @@ fun OptionChoice(
         selected -> "已选中"
         else -> ""
     }
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = 5.dp)
-            .scale(scale)
-            .shadow(if (selected) 3.dp else 0.dp, ShapeOption, ambientColor = Color.Black.copy(0.04f))
-            .clip(ShapeOption)
-            .background(bg)
-            .border(1.5.dp, borderColor, ShapeOption)
-            .semantics {
-                role = Role.RadioButton
-                this.selected = selected
-                if (stateLabel.isNotEmpty()) contentDescription = "${QuestionLogic.optionText(opt)}，$stateLabel"
-            }
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(16.dp, 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
+    Column(Modifier.fillMaxWidth()) {
+        Row(
             Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(letterBg),
-            contentAlignment = Alignment.Center,
+                .fillMaxWidth()
+                .padding(vertical = 5.dp)
+                .scale(scale)
+                .shadow(if (selected) 3.dp else 0.dp, ShapeOption, ambientColor = Color.Black.copy(0.04f))
+                .clip(ShapeOption)
+                .background(bg)
+                .border(1.5.dp, borderColor, ShapeOption)
+                .semantics {
+                    role = Role.RadioButton
+                    this.selected = selected
+                    if (stateLabel.isNotEmpty()) contentDescription = "${QuestionLogic.optionText(opt)}，$stateLabel"
+                }
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(16.dp, 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(QuestionLogic.optionLetter(opt), fontWeight = FontWeight.Bold, color = letterColor, fontSize = 14.sp)
+            Box(
+                Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(letterBg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(QuestionLogic.optionLetter(opt), fontWeight = FontWeight.Bold, color = letterColor, fontSize = 14.sp)
+            }
+            Spacer(Modifier.width(14.dp))
+            Text(QuestionLogic.optionText(opt), style = MaterialTheme.typography.bodyLarge, fontSize = 15.sp, lineHeight = 22.sp)
         }
-        Spacer(Modifier.width(14.dp))
-        Text(QuestionLogic.optionText(opt), style = MaterialTheme.typography.bodyLarge, fontSize = 15.sp, lineHeight = 22.sp)
+        if (!optionExpl.isNullOrBlank()) {
+            Text(
+                optionExpl,
+                style = MaterialTheme.typography.bodySmall,
+                color = InkTertiary,
+                lineHeight = 18.sp,
+                modifier = Modifier.padding(start = 62.dp, end = 16.dp, bottom = 6.dp),
+            )
+        }
     }
 }
 
@@ -570,6 +583,60 @@ fun EmptyState(message: String) {
         contentAlignment = Alignment.Center,
     ) {
         Text(message, style = MaterialTheme.typography.bodyMedium, color = InkTertiary)
+    }
+}
+
+@Composable
+fun QuestionExplanationSection(q: Question, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        if (q.expl.isNotBlank()) {
+            InfoPanel("题目解析", q.expl)
+            Spacer(Modifier.height(10.dp))
+        }
+        if (!q.answerExpl.isNullOrBlank()) {
+            InfoPanel("正确选项解析", q.answerExpl)
+            Spacer(Modifier.height(10.dp))
+        }
+        val optionEntries = q.options.mapNotNull { opt ->
+            QuestionLogic.optionExplFor(q, opt)?.let { expl -> opt to expl }
+        }
+        if (optionEntries.isNotEmpty()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(ShapeCard)
+                    .background(SurfaceMuted)
+                    .padding(16.dp),
+            ) {
+                Text(
+                    "选项解析",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = InkSecondary,
+                )
+                optionEntries.forEach { (opt, expl) ->
+                    Spacer(Modifier.height(10.dp))
+                    val label = if (q.type == "判断") {
+                        QuestionLogic.optionExplKey(q, opt)
+                    } else {
+                        QuestionLogic.optionLetter(opt)
+                    }
+                    Text(
+                        "$label. ${QuestionLogic.optionText(opt)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = InkPrimary,
+                    )
+                    Text(
+                        expl,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = InkTertiary,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        }
     }
 }
 

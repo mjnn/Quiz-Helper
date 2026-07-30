@@ -18,6 +18,24 @@ object QuestionLogic {
         return q.options.firstOrNull { optionLetter(it) == q.answer } ?: ""
     }
 
+    /** 选项解析 map 的 key：单选为 A–D，判断题为「正确」/「错误」。 */
+    fun optionExplKey(q: Question, opt: String): String =
+        if (q.type == "判断") judgeOptionLabel(opt) else optionLetter(opt)
+
+    fun optionExplFor(q: Question, opt: String): String? =
+        q.optionExpls.orEmpty()[optionExplKey(q, opt)]?.trim()?.takeIf { it.isNotEmpty() }
+
+    fun hasExplanation(q: Question): Boolean =
+        q.expl.isNotBlank() ||
+            !q.answerExpl.isNullOrBlank() ||
+            q.optionExpls.orEmpty().values.any { it.isNotBlank() }
+
+    private fun judgeOptionLabel(opt: String): String = when {
+        opt.contains("正确") || opt.trim() == "对" -> "正确"
+        opt.contains("错误") || opt.trim() == "错" -> "错误"
+        else -> opt.trim()
+    }
+
     fun <T> shuffle(list: List<T>): List<T> {
         val a = list.toMutableList()
         for (i in a.lastIndex downTo 1) {

@@ -1,9 +1,9 @@
 package com.aitrainer.practice.data
 
 /** 内置/导入题库中的子题库（按题型划分） */
-enum class BankKind(val type: String, val label: String) {
-    SINGLE("单选", "单选题库"),
-    JUDGE("判断", "判断题库"),
+enum class BankKind(val type: String, val label: String, val displayName: String) {
+    SINGLE("单选", "单选题库", "人工智能训练师（三级）理论题-单选"),
+    JUDGE("判断", "判断题库", "人工智能训练师（三级）理论题-判断"),
 }
 
 /** 智能抽题范围 */

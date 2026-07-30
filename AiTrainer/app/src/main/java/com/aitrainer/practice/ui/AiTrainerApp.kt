@@ -83,6 +83,7 @@ import com.aitrainer.practice.data.MemoryRetention
 import com.aitrainer.practice.data.StageBankItem
 import com.aitrainer.practice.data.StageStat
 import com.aitrainer.practice.data.WrongNotebookEntry
+import com.aitrainer.practice.data.toQuestion
 import com.aitrainer.practice.ui.components.EbbinghausStageChart
 import com.aitrainer.practice.ui.components.SettingsFab
 import com.aitrainer.practice.ui.components.WrongNotebookFab
@@ -103,11 +104,16 @@ import com.aitrainer.practice.ui.theme.OnDark
 import com.aitrainer.practice.ui.theme.Paper
 import com.aitrainer.practice.ui.theme.Success
 import com.aitrainer.practice.ui.theme.SurfaceDark
+import com.aitrainer.practice.ui.components.QuestionExplanationSection
 import com.aitrainer.practice.ui.components.SectionLabel
 import com.aitrainer.practice.ui.components.SecondaryButton
 import com.aitrainer.practice.ui.components.MemorizeFab
 import com.aitrainer.practice.ui.components.StartPracticeFab
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Slider
@@ -120,12 +126,27 @@ import com.aitrainer.practice.ui.theme.Warning
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AiTrainerApp(vm: AppViewModel, onRequestImport: () -> Unit = {}) {
+fun AiTrainerApp(
+    vm: AppViewModel,
+    onRequestImport: () -> Unit = {},
+    onRequestOcrGallery: () -> Unit = {},
+    onRequestOcrGalleryBatch: () -> Unit = {},
+    onRequestOcrGalleryCrop: () -> Unit = {},
+    onRequestOcrCamera: () -> Unit = {},
+    onRequestOcrAddImages: () -> Unit = {},
+    onShareOcrExport: (String) -> Unit = {},
+) {
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(vm.toast) {
         vm.toast?.let {
             snackbar.showSnackbar(it)
             vm.dismissToast()
+        }
+    }
+    LaunchedEffect(vm.pendingOcrExportJson) {
+        vm.pendingOcrExportJson?.let { json ->
+            onShareOcrExport(json)
+            vm.consumeOcrExportRequest()
         }
     }
 
@@ -191,6 +212,33 @@ fun AiTrainerApp(vm: AppViewModel, onRequestImport: () -> Unit = {}) {
                 },
             )
         }
+        is PendingDialog.ImportBankPicker -> {
+            AlertDialog(
+                onDismissRequest = vm::dismissDialog,
+                title = { Text("选择题库", fontWeight = FontWeight.SemiBold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "请选择要导入到哪个题库（另一题库题目不受影响）：",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = InkSecondary,
+                        )
+                        BankKind.entries.forEach { kind ->
+                            val count = when (kind) {
+                                BankKind.SINGLE -> vm.bankInfo.fullSingleCount
+                                BankKind.JUDGE -> vm.bankInfo.fullJudgeCount
+                            }
+                            TextButton(onClick = { vm.confirmJsonImportToBank(kind) }) {
+                                Text("${kind.displayName}（当前 $count 题）")
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = vm::dismissDialog) { Text("取消") }
+                },
+            )
+        }
         null -> Unit
     }
 
@@ -201,7 +249,14 @@ fun AiTrainerApp(vm: AppViewModel, onRequestImport: () -> Unit = {}) {
             sheetState = sheetState,
             containerColor = SurfaceWhite,
         ) {
-            SettingsSheet(vm = vm, onRequestImport = onRequestImport)
+            SettingsSheet(
+                vm = vm,
+                onRequestImport = onRequestImport,
+                onRequestOcrGallery = onRequestOcrGallery,
+                onRequestOcrGalleryBatch = onRequestOcrGalleryBatch,
+                onRequestOcrGalleryCrop = onRequestOcrGalleryCrop,
+                onRequestOcrCamera = onRequestOcrCamera,
+            )
         }
     }
 
@@ -237,7 +292,10 @@ fun AiTrainerApp(vm: AppViewModel, onRequestImport: () -> Unit = {}) {
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding).systemBarsPadding()) {
             Column(Modifier.fillMaxSize()) {
-                if (vm.screen !is Screen.Expired) {
+                if (vm.screen !is Screen.Expired &&
+                    vm.screen !is Screen.OcrDraftPreview &&
+                    vm.screen !is Screen.OcrDraftEdit
+                ) {
                     AppHeader(compact = vm.screen is Screen.Practice)
                 }
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -263,9 +321,54 @@ fun AiTrainerApp(vm: AppViewModel, onRequestImport: () -> Unit = {}) {
                         Screen.AllCaughtUp -> AllCaughtUpScreen(total = vm.stats.totalQuestions, onReset = { vm.requestReset() }, onHome = vm::goHome)
                         is Screen.Practice -> PracticeScreen(s, vm)
                         is Screen.Result -> ResultScreen(s.stats, onViewWrong = vm::showResultWrong, onAgain = vm::requestStartPractice, onHome = vm::goHome)
-                        is Screen.Bank -> BankScreen(s.title, s.items, s.stage, onPreview = vm::previewQuestion)
+                        is Screen.Bank -> BankScreen(s.title, s.items, s.stage, onPreview = vm::previewQuestion, onBack = vm::goHome)
                         is Screen.Review -> ReviewScreen(s.title, s.items, hasBack = s.backTo != null, onBack = vm::leaveReview)
-                        Screen.WrongNotebook -> WrongNotebookScreen(vm.wrongNotebook)
+                        Screen.WrongNotebook -> WrongNotebookScreen(vm.wrongNotebook, onBack = vm::goHome)
+                        Screen.OcrImportReview -> {
+                            val session = vm.ocrSession
+                            if (session != null) {
+                                OcrImportReviewScreen(
+                                    session = session,
+                                    onOpenPreview = vm::openOcrDraftPreview,
+                                    onRequestAddImages = onRequestOcrAddImages,
+                                    onExportJson = vm::exportOcrBatch,
+                                    onAddDraft = vm::addOcrDraft,
+                                    onTargetBankChange = vm::setOcrTargetBank,
+                                    onDuplicatePolicyChange = vm::setOcrDuplicatePolicy,
+                                    onConfirmImport = vm::confirmOcrImport,
+                                    onCancel = vm::cancelOcrImport,
+                                )
+                            }
+                        }
+                        Screen.OcrDraftPreview -> {
+                            val session = vm.ocrSession
+                            if (session != null && session.drafts.isNotEmpty()) {
+                                val index = session.previewIndex.coerceIn(0, session.drafts.lastIndex)
+                                val current = session.drafts[index]
+                                OcrDraftPreviewScreen(
+                                    drafts = session.drafts,
+                                    previewIndex = session.previewIndex,
+                                    selectedIds = session.selectedIds,
+                                    onBackToSettings = vm::openOcrImportSettings,
+                                    onPrevious = vm::ocrPreviewPrevious,
+                                    onNext = vm::ocrPreviewNext,
+                                    onToggleSelected = { vm.toggleOcrDraftSelected(current.draftId) },
+                                    onEdit = { vm.openOcrDraftEdit(current.draftId) },
+                                    onRemove = { vm.removeOcrDraft(current.draftId) },
+                                )
+                            }
+                        }
+                        is Screen.OcrDraftEdit -> {
+                            val session = vm.ocrSession
+                            val draft = session?.drafts?.find { it.draftId == s.draftId }
+                            if (draft != null) {
+                                OcrDraftEditScreen(
+                                    draft = draft,
+                                    onBack = vm::closeOcrDraftEdit,
+                                    onSave = vm::saveOcrDraftEdit,
+                                )
+                            }
+                        }
                     }
                 }
                 }
@@ -289,6 +392,30 @@ fun AiTrainerApp(vm: AppViewModel, onRequestImport: () -> Unit = {}) {
                     StartPracticeFab(visible = true, onClick = vm::requestStartPractice)
                 }
             }
+            if (vm.ocrLoading) {
+                OcrLoadingOverlay()
+            }
+        }
+    }
+}
+
+@Composable
+private fun OcrLoadingOverlay() {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.35f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        ElevatedCard {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(24.dp),
+            ) {
+                androidx.compose.material3.CircularProgressIndicator(color = Accent)
+                Spacer(Modifier.height(12.dp))
+                Text("正在识别图片…", color = InkPrimary, fontWeight = FontWeight.Medium)
+            }
         }
     }
 }
@@ -303,6 +430,9 @@ private fun screenTransitionKey(screen: Screen): String = when (screen) {
     is Screen.Result -> "result"
     is Screen.Bank -> "bank-${screen.stage ?: "list"}"
     is Screen.Review -> "review"
+    Screen.OcrImportReview -> "ocr-review"
+    Screen.OcrDraftPreview -> "ocr-preview"
+    is Screen.OcrDraftEdit -> "ocr-edit-${screen.draftId}"
 }
 
 private fun shouldShowHomeActions(screen: Screen): Boolean = when (screen) {
@@ -312,7 +442,14 @@ private fun shouldShowHomeActions(screen: Screen): Boolean = when (screen) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SettingsSheet(vm: AppViewModel, onRequestImport: () -> Unit) {
+private fun SettingsSheet(
+    vm: AppViewModel,
+    onRequestImport: () -> Unit,
+    onRequestOcrGallery: () -> Unit,
+    onRequestOcrGalleryBatch: () -> Unit,
+    onRequestOcrGalleryCrop: () -> Unit,
+    onRequestOcrCamera: () -> Unit,
+) {
     Column(
         Modifier
             .verticalScroll(rememberScrollState())
@@ -418,7 +555,7 @@ private fun SettingsSheet(vm: AppViewModel, onRequestImport: () -> Unit) {
                     selected = enabled,
                     onClick = { vm.toggleBankKind(kind) },
                     enabled = count > 0 || enabled,
-                    label = { Text("${kind.label}（$count）") },
+                    label = { Text("${kind.displayName}（$count）") },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = AccentSoft,
                         selectedLabelColor = Accent,
@@ -438,7 +575,33 @@ private fun SettingsSheet(vm: AppViewModel, onRequestImport: () -> Unit) {
             onRequestImport()
         })
         Text(
-            "支持与本应用相同格式的 questions.json 数组文件",
+            "支持与本应用相同格式的 questions.json；导入前需选择题库",
+            style = MaterialTheme.typography.labelMedium,
+            color = InkTertiary,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        Spacer(Modifier.height(12.dp))
+        SecondaryButton("拍照识别导入（OCR）", onClick = {
+            vm.closeSettings()
+            onRequestOcrCamera()
+        }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        SecondaryButton("相册识别导入（OCR）", onClick = {
+            vm.closeSettings()
+            onRequestOcrGallery()
+        }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        SecondaryButton("批量相册识别（OCR）", onClick = {
+            vm.closeSettings()
+            onRequestOcrGalleryBatch()
+        }, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(8.dp))
+        SecondaryButton("裁剪后识别（OCR）", onClick = {
+            vm.closeSettings()
+            onRequestOcrGalleryCrop()
+        }, modifier = Modifier.fillMaxWidth())
+        Text(
+            "识别后可逐题编辑、手动加题、导出 JSON，确认后追加到题库",
             style = MaterialTheme.typography.labelMedium,
             color = InkTertiary,
             modifier = Modifier.padding(top = 8.dp),
@@ -751,14 +914,15 @@ private fun MemorizeQuestionBody(q: Question) {
                 correct = isCorrect,
                 wrong = false,
                 enabled = false,
+                optionExpl = QuestionLogic.optionExplFor(q, opt),
                 onClick = {},
             )
         }
         Spacer(Modifier.height(12.dp))
         InfoPanel("正确答案", QuestionLogic.correctText(q))
-        if (q.expl.isNotBlank()) {
+        if (QuestionLogic.hasExplanation(q)) {
             Spacer(Modifier.height(10.dp))
-            InfoPanel("解析", q.expl)
+            QuestionExplanationSection(q)
         }
         if (q.mem.isNotBlank() || q.assoc.isNotBlank()) {
             Spacer(Modifier.height(10.dp))
@@ -859,20 +1023,40 @@ private fun ResultStat(label: String, value: String, color: androidx.compose.ui.
 }
 
 @Composable
-private fun WrongNotebookScreen(entries: List<WrongNotebookEntry>) {
+private fun WrongNotebookScreen(
+    entries: List<WrongNotebookEntry>,
+    onBack: () -> Unit,
+) {
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
             ElevatedCard {
-                Text("错题本", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "按做错次数降序 · 共 ${entries.size} 题",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = InkSecondary,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "返回",
+                            tint = InkSecondary,
+                        )
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("错题本", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "按做错次数降序 · 共 ${entries.size} 题",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = InkSecondary,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
             }
         }
         if (entries.isEmpty()) {
@@ -916,15 +1100,16 @@ private fun WrongNotebookScreen(entries: List<WrongNotebookEntry>) {
                                 correct = isCorrect,
                                 wrong = false,
                                 enabled = false,
+                                optionExpl = QuestionLogic.optionExplFor(q, opt),
                                 onClick = {},
                             )
                         }
                     }
                     Spacer(Modifier.height(12.dp))
                     InfoPanel("正确答案", QuestionLogic.correctText(q))
-                    if (q.expl.isNotBlank()) {
+                    if (QuestionLogic.hasExplanation(q)) {
                         Spacer(Modifier.height(10.dp))
-                        InfoPanel("解析", q.expl)
+                        QuestionExplanationSection(q)
                     }
                     if (q.mem.isNotBlank() || q.assoc.isNotBlank()) {
                         Spacer(Modifier.height(10.dp))
@@ -942,6 +1127,7 @@ private fun BankScreen(
     items: List<StageBankItem>,
     stage: Int?,
     onPreview: (String) -> Unit,
+    onBack: () -> Unit,
 ) {
     val freshCount = items.count { it.retention == MemoryRetention.FRESH }
     val forgottenCount = items.count { it.retention == MemoryRetention.FORGOTTEN }
@@ -956,7 +1142,26 @@ private fun BankScreen(
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             ElevatedCard {
-                Text(title, style = MaterialTheme.typography.titleLarge)
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "返回",
+                            tint = InkSecondary,
+                        )
+                    }
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
                 Text("${items.size} 题", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
                 if (showRetentionLegend) {
                     Text(
@@ -1042,20 +1247,28 @@ private fun ReviewScreen(
 
 @Composable
 private fun ReviewItemContent(item: WrongReviewItem) {
-    val q = Question(item.id, item.tag, item.type, item.stem, item.options, item.answer)
+    val q = item.toQuestion()
     Text(listOfNotNull(item.roundLabel, item.tag).joinToString(" · "), style = MaterialTheme.typography.labelLarge, color = InkTertiary)
     Text(item.stem, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, modifier = Modifier.padding(vertical = 12.dp))
     if (item.skipped) Text("已跳过", color = Warning, style = MaterialTheme.typography.labelLarge)
     item.options.forEach { opt ->
         val isC = QuestionLogic.correctText(q) == opt
         val isU = !item.skipped && opt == item.userAnswer
-        OptionChoice(opt, selected = isU, correct = isC, wrong = isU, enabled = false, onClick = {})
+        OptionChoice(
+            opt,
+            selected = isU,
+            correct = isC,
+            wrong = isU,
+            enabled = false,
+            optionExpl = QuestionLogic.optionExplFor(q, opt),
+            onClick = {},
+        )
     }
     Spacer(Modifier.height(12.dp))
     InfoPanel("正确答案", QuestionLogic.correctText(q))
-    if (item.expl.isNotBlank()) {
+    if (QuestionLogic.hasExplanation(q)) {
         Spacer(Modifier.height(10.dp))
-        InfoPanel("解析", item.expl)
+        QuestionExplanationSection(q)
     }
     Spacer(Modifier.height(10.dp))
     MemAssocPanel(item.mem, item.assoc)

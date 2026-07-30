@@ -21,8 +21,8 @@ android {
         applicationId = "com.aitrainer.practice"
         minSdk = 21
         targetSdk = 34
-        versionCode = 13
-        versionName = "1.13"
+        versionCode = 15
+        versionName = "1.15"
     }
 
     signingConfigs {
@@ -83,6 +83,9 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
     implementation("com.google.code.gson:gson:2.11.0")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+    implementation("com.vanniktech:android-image-cropper:4.6.0")
 
     testImplementation("junit:junit:4.13.2")
 }

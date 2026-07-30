@@ -1,0 +1,85 @@
+name: iOS Build & Test
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "AiTrainerIOS/**"
+      - "AiTrainer/app/src/main/assets/**"
+      - ".github/workflows/ios-build.yml"
+  pull_request:
+    paths:
+      - "AiTrainerIOS/**"
+      - "AiTrainer/app/src/main/assets/**"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: AiTrainerIOS
+
+jobs:
+  ios:
+    name: Build AiTrainerIOS + SRS tests
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Sync question bank assets
+        run: python3 scripts/sync_assets.py
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Resolve iOS Simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          # Prefer recent iPhone simulators shipped with Xcode on GitHub runners.
+          for NAME in "iPhone 16" "iPhone 16 Pro" "iPhone 15" "iPhone 15 Pro" "iPhone SE (3rd generation)"; do
+            if xcrun simctl list devices available | grep -F "$NAME" | grep -q .; then
+              echo "name=$NAME" >> "$GITHUB_OUTPUT"
+              echo "Using simulator: $NAME"
+              exit 0
+            fi
+          done
+          echo "No suitable iPhone simulator found"
+          xcrun simctl list devices available
+          exit 1
+
+      - name: Build for iOS Simulator
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project AiTrainer.xcodeproj \
+            -scheme AiTrainer \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run SRS unit tests (AiTrainerCoreTests)
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project AiTrainer.xcodeproj \
+            -scheme AiTrainer \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -sdk iphonesimulator \
+            -only-testing:AiTrainerCoreTests \
+            CODE_SIGNING_ALLOWED=NO

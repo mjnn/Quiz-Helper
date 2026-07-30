@@ -2,7 +2,7 @@ package com.aitrainer.practice.data
 
 object AppConfig {
     const val AUTHOR = "马老师"
-    const val VERSION_LABEL = "V1.13"
+    const val VERSION_LABEL = "V1.15"
     const val QBANK_VERSION = "20260726_604"
     const val DEFAULT_SESSION_LIMIT = 50
     const val MIN_SESSION_LIMIT = 5

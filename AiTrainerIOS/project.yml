@@ -1,0 +1,55 @@
+name: AiTrainer
+options:
+  bundleIdPrefix: com.aitrainer
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+
+packages:
+  AiTrainerCore:
+    path: AiTrainerCore
+
+targets:
+  AiTrainer:
+    type: application
+    platform: iOS
+    sources:
+      - path: AiTrainer
+    resources:
+      - path: Resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aitrainer.practice
+        MARKETING_VERSION: "1.15"
+        CURRENT_PROJECT_VERSION: "15"
+        SWIFT_VERSION: "5.9"
+        DEVELOPMENT_TEAM: ""
+        INFOPLIST_KEY_CFBundleDisplayName: AI训练师刷题
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - package: AiTrainerCore
+
+  AiTrainerCoreTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: AiTrainerCore/Tests/AiTrainerCoreTests
+    dependencies:
+      - target: AiTrainer
+      - package: AiTrainerCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  AiTrainer:
+    build:
+      targets:
+        AiTrainer: all
+    test:
+      targets:
+        - AiTrainerCoreTests

@@ -4,4 +4,9 @@
         <item name="android:statusBarColor">@color/brand_primary</item>
         <item name="android:navigationBarColor">@android:color/white</item>
     </style>
+
+    <style name="Theme.AiTrainer.Cropper" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="colorPrimaryDark">@color/brand_primary</item>
+    </style>
 </resources>
